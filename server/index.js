@@ -130,27 +130,72 @@ app.post('/api/upload-resume', upload.single('resume'), async (req, res) => {
 
     // Parse resume content using Gemini AI
     const resumeData = await parseResumeContent(req.file.path, req.file.originalname);
+    console.log('Resume parsed successfully:', resumeData);
 
-    // Create candidate record
-    const { data: candidate, error } = await supabase
+    // Check if candidate already exists
+    console.log('Checking if candidate already exists...');
+    const { data: existingCandidate, error: checkError } = await supabase
       .from('candidates')
-      .insert({
-        name,
-        email,
-        resume_filename: req.file.filename,
-        resume_content: resumeData.content,
-        skills: resumeData.skills,
-        experience_years: resumeData.experienceYears,
-        seniority_level: resumeData.seniorityLevel,
-        preferred_location: preferredLocation || null,
-        education: resumeData.education,
-        current_role: resumeData.currentRole,
-        summary: resumeData.summary
-      })
-      .select()
+      .select('*')
+      .eq('email', email)
       .single();
 
-    if (error) throw error;
+    let candidate;
+    if (existingCandidate) {
+      // Update existing candidate
+      console.log('Updating existing candidate...');
+      const { data: updatedCandidate, error: updateError } = await supabase
+        .from('candidates')
+        .update({
+          name,
+          resume_filename: req.file.filename,
+          resume_content: resumeData.content,
+          skills: resumeData.skills,
+          experience_years: resumeData.experienceYears,
+          seniority_level: resumeData.seniorityLevel,
+          preferred_location: preferredLocation || null,
+          education: resumeData.education,
+          current_role: resumeData.currentRole,
+          summary: resumeData.summary
+        })
+        .eq('email', email)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('Database update error:', updateError);
+        throw updateError;
+      }
+      candidate = updatedCandidate;
+      console.log('Candidate updated successfully:', candidate);
+    } else {
+      // Create new candidate
+      console.log('Creating new candidate...');
+      const { data: newCandidate, error } = await supabase
+        .from('candidates')
+        .insert({
+          name,
+          email,
+          resume_filename: req.file.filename,
+          resume_content: resumeData.content,
+          skills: resumeData.skills,
+          experience_years: resumeData.experienceYears,
+          seniority_level: resumeData.seniorityLevel,
+          preferred_location: preferredLocation || null,
+          education: resumeData.education,
+          current_role: resumeData.currentRole,
+          summary: resumeData.summary
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Database insert error:', error);
+        throw error;
+      }
+      candidate = newCandidate;
+      console.log('Candidate created successfully:', candidate);
+    }
 
     // Generate job matches
     const { data: jobs } = await supabase

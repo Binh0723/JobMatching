@@ -30,10 +30,27 @@ async function extractTextFromFile(filePath, originalName) {
         
         pdfParser.on("pdfParser_dataReady", function(pdfData) {
           const text = pdfParser.getRawTextContent();
-          resolve(text);
+          console.log('Extracted PDF text length:', text.length);
+          console.log('Extracted PDF text (first 1000 chars):', text.substring(0, 1000));
+          
+          // Clean up the text
+          const cleanedText = text
+            .replace(/\s+/g, ' ') // Replace multiple spaces with single space
+            .replace(/\n+/g, '\n') // Replace multiple newlines with single newline
+            .trim();
+          
+          console.log('Cleaned text length:', cleanedText.length);
+          console.log('Cleaned text (first 1000 chars):', cleanedText.substring(0, 1000));
+          
+          if (cleanedText.length < 50) {
+            console.warn('Warning: Very little text extracted from PDF. This might indicate a parsing issue.');
+          }
+          
+          resolve(cleanedText);
         });
         
         pdfParser.on("pdfParser_dataError", function(errData) {
+          console.error('PDF parsing error:', errData);
           reject(new Error('Failed to parse PDF: ' + errData.parserError));
         });
         
@@ -41,6 +58,7 @@ async function extractTextFromFile(filePath, originalName) {
       });
     } else if (fileExtension === '.docx') {
       const result = await mammoth.extractRawText({ path: filePath });
+      console.log('Extracted DOCX text:', result.value.substring(0, 500) + '...'); // Log first 500 chars
       return result.value;
     } else if (fileExtension === '.doc') {
       // For .doc files, you might need additional libraries
@@ -60,8 +78,9 @@ async function analyzeResumeWithGemini(resumeText) {
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const prompt = `
-    Analyze the following resume and extract the following information in JSON format:
-    
+    Analyze the following resume and extract ONLY the information that is explicitly stated. DO NOT make assumptions or infer information that is not directly mentioned.
+
+    Expected JSON structure:
     {
       "skills": ["skill1", "skill2", "skill3"],
       "experience_years": number,
@@ -71,17 +90,22 @@ async function analyzeResumeWithGemini(resumeText) {
       "summary": "brief_summary_of_candidate"
     }
     
-    Guidelines:
-    - Extract technical skills, programming languages, frameworks, tools
-    - Calculate total years of professional experience
-    - Determine seniority level: entry-level (0-2 years), mid-level (3-6 years), senior-level (7+ years)
-    - Include soft skills and domain expertise
-    - Be specific about technologies and tools mentioned
+    CRITICAL RULES:
+    - Only extract skills that are EXPLICITLY mentioned in the resume
+    - Count internships, co-ops as valid experience
+    - Calculate total experience including: internships, co-ops, part-time work, freelance work
+    - Focus on the MOST DOMINANT experience (longest duration and most relevant to target role)
+    - If no professional experience is mentioned, use 0 years and "entry-level"
+    - If internships are mentioned, count them as experience (typically 0.5-2 years depending on duration)
+    - If no current role is mentioned, use "Student" or "Recent Graduate"
+    - If no education is mentioned, use "Not specified"
+    - DO NOT infer or assume any information not directly stated
+    - If the resume appears to be entry-level, mark it as "entry-level" regardless of keywords
     
     Resume content:
     ${resumeText}
     
-    Return only the JSON object, no additional text.
+    IMPORTANT: Return ONLY the JSON object, no markdown formatting, no code blocks, no additional text or explanations.
     `;
 
     const result = await model.generateContent(prompt);

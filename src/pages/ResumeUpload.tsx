@@ -96,8 +96,13 @@ const ResumeUpload: React.FC = () => {
         throw new Error(result.error || 'Upload failed');
       }
 
-      setCurrentCandidate(result.candidate);
-      navigate('/dashboard');
+      // Only set candidate if the response contains candidate data
+      if (result.candidate) {
+        setCurrentCandidate(result.candidate);
+        navigate('/dashboard');
+      } else {
+        throw new Error('No candidate data received from server');
+      }
     } catch (error) {
       console.error('Upload error:', error);
       setError(error instanceof Error ? error.message : 'Upload failed');
