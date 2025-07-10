@@ -202,7 +202,26 @@ app.post('/api/upload-resume', upload.single('resume'), async (req, res) => {
       .from('jobs')
       .select('*');
 
-    const matches = jobs.map(job => ({
+    // Filter jobs based on candidate's experience level
+    const filteredJobs = jobs.filter(job => {
+      const candidateLevel = candidate.seniority_level;
+      const jobLevel = job.experience_level;
+      
+      // Define level compatibility
+      const levelCompatibility = {
+        'entry-level': ['entry-level'],
+        'mid-level': ['entry-level', 'mid-level'],
+        'senior-level': ['mid-level', 'senior-level'],
+        'manager': ['senior-level', 'manager'],
+        'director': ['senior-level', 'manager', 'director'],
+        'vp': ['manager', 'director', 'vp'],
+        'c-level': ['director', 'vp', 'c-level']
+      };
+      
+      return levelCompatibility[candidateLevel]?.includes(jobLevel) || false;
+    });
+
+    const matches = filteredJobs.map(job => ({
       candidate_id: candidate.id,
       job_id: job.id,
       match_score: calculateMatchScore(candidate, job)
@@ -261,9 +280,28 @@ app.get('/api/candidate/:id/dashboard', async (req, res) => {
 
     if (matchesError) throw matchesError;
 
+    // Filter matches based on candidate's experience level
+    const filteredMatches = matches.filter(match => {
+      const candidateLevel = candidate.seniority_level;
+      const jobLevel = match.jobs.experience_level;
+      
+      // Define level compatibility
+      const levelCompatibility = {
+        'entry-level': ['entry-level'],
+        'mid-level': ['entry-level', 'mid-level'],
+        'senior-level': ['mid-level', 'senior-level'],
+        'manager': ['senior-level', 'manager'],
+        'director': ['senior-level', 'manager', 'director'],
+        'vp': ['manager', 'director', 'vp'],
+        'c-level': ['director', 'vp', 'c-level']
+      };
+      
+      return levelCompatibility[candidateLevel]?.includes(jobLevel) || false;
+    });
+
     res.json({
       candidate,
-      recommendations: matches
+      recommendations: filteredMatches
     });
   } catch (error) {
     console.error('Error fetching dashboard data:', error);
