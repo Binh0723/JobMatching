@@ -6,7 +6,7 @@ import dotenv from 'dotenv';
 
 // Import routes and middleware
 import { uploadResumeResumeBased, getResumeBasedMatches } from './routes/candidates.js';
-import { getAllJobs, getJobDetails } from './routes/jobs.js';
+import { getAllJobs, getJobDetails, searchJobs } from './routes/jobs.js';
 import { upload } from './middleware/upload.js';
 
 // Load environment variables
@@ -29,6 +29,7 @@ if (process.env.NODE_ENV === 'production') {
 
 // API Routes
 app.get('/api/jobs', getAllJobs);
+app.get('/api/jobs/search', searchJobs);
 app.get('/api/jobs/:id', getJobDetails);
 
 // Resume-based routes (no database storage of matches)

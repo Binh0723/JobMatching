@@ -317,4 +317,84 @@ export async function createSampleJobs(req, res) {
   }
 }
 
+// Search jobs with filters
+export async function searchJobs(req, res) {
+  try {
+    const { 
+      page = 1, 
+      limit = 12, 
+      search = '', 
+      location = '', 
+      experience = '', 
+      remote = '' 
+    } = req.query;
+    
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const offset = (pageNum - 1) * limitNum;
+
+    // --- Build count query ---
+    let countQuery = supabase.from('jobs').select('*', { count: 'exact', head: true });
+    if (search) {
+      countQuery = countQuery.or(`title.ilike.%${search}%,company.ilike.%${search}%,description.ilike.%${search}%`);
+    }
+    if (location) {
+      countQuery = countQuery.ilike('location', `%${location}%`);
+    }
+    if (experience) {
+      countQuery = countQuery.eq('experience_level', experience);
+    }
+    if (remote === 'true') {
+      countQuery = countQuery.eq('remote_friendly', true);
+    }
+    const { count: totalJobs, error: countError } = await countQuery;
+    if (countError) {
+      console.error('Count error:', countError);
+      throw countError;
+    }
+
+    // --- Build data query ---
+    let dataQuery = supabase.from('jobs').select('*');
+    if (search) {
+      dataQuery = dataQuery.or(`title.ilike.%${search}%,company.ilike.%${search}%,description.ilike.%${search}%`);
+    }
+    if (location) {
+      dataQuery = dataQuery.ilike('location', `%${location}%`);
+    }
+    if (experience) {
+      dataQuery = dataQuery.eq('experience_level', experience);
+    }
+    if (remote === 'true') {
+      dataQuery = dataQuery.eq('remote_friendly', true);
+    }
+    const { data: jobs, error } = await dataQuery
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limitNum - 1);
+    if (error) {
+      console.error('Data error:', error);
+      throw error;
+    }
+
+    // Calculate pagination info
+    const totalPages = Math.ceil((totalJobs || 0) / limitNum);
+    const hasNextPage = pageNum < totalPages;
+    const hasPrevPage = pageNum > 1;
+
+    res.json({
+      jobs: jobs || [],
+      pagination: {
+        currentPage: pageNum,
+        totalPages,
+        totalItems: totalJobs || 0,
+        itemsPerPage: limitNum,
+        hasNextPage,
+        hasPrevPage
+      }
+    });
+  } catch (error) {
+    console.error('Error searching jobs:', error);
+    res.status(500).json({ error: 'Failed to search jobs' });
+  }
+}
+
  
