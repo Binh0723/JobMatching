@@ -5,6 +5,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import Pagination from '../components/Pagination';
 import PageSizeSelector from '../components/PageSizeSelector';
 import { useApp } from '../contexts/AppContext';
+import { useNavigate } from 'react-router-dom';
 
 interface JobMatch {
   id: string;
@@ -28,6 +29,7 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (currentCandidate) {
@@ -266,7 +268,7 @@ const Dashboard: React.FC = () => {
                   </p>
                   <div className="mt-6">
                     <button 
-                      onClick={() => window.location.href = '/upload'}
+                      onClick={() => navigate('/upload')}
                       className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
                     >
                       Upload a Different Resume
