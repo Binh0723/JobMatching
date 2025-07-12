@@ -96,10 +96,14 @@ export async function uploadResumeResumeBased(req, res) {
       candidate: newCandidate
     })), 30);
     
+    // Sort by match score from highest to lowest
+    const sortedMatches = qualityMatches.sort((a, b) => b.match_score - a.match_score);
+    
     console.log(`Created ${matches.length} total matches, ${qualityMatches.length} with score >= 30`);
+    console.log(`Top match score: ${sortedMatches[0]?.match_score || 0}, Lowest match score: ${sortedMatches[sortedMatches.length - 1]?.match_score || 0}`);
     
     // If no quality matches found, return early
-    if (qualityMatches.length === 0) {
+    if (sortedMatches.length === 0) {
       console.log('No quality matches found (all scores below 30). No matches will be created.');
       res.json({ 
         message: 'Resume uploaded successfully, but no suitable job matches found. Consider updating your skills or experience.',
@@ -116,8 +120,8 @@ export async function uploadResumeResumeBased(req, res) {
       message: 'Resume uploaded successfully',
       candidateId: newCandidate.id,
       candidate: newCandidate,
-      matchesCount: qualityMatches.length,
-      recommendations: qualityMatches.slice(0, 10) // Return first 10 matches
+      matchesCount: sortedMatches.length,
+      recommendations: sortedMatches.slice(0, 10) // Return first 10 matches (already sorted by score)
     });
   } catch (error) {
     console.error('Error uploading resume:', error);
@@ -166,11 +170,15 @@ export async function getResumeBasedMatches(req, res) {
       candidate: candidate
     })), 30);
 
+    // Sort by match score from highest to lowest
+    const sortedMatches = qualityMatches.sort((a, b) => b.match_score - a.match_score);
+
     // Apply pagination
-    const totalMatches = qualityMatches.length;
-    const paginatedMatches = qualityMatches.slice(offset, offset + limitNum);
+    const totalMatches = sortedMatches.length;
+    const paginatedMatches = sortedMatches.slice(offset, offset + limitNum);
 
     console.log(`Dashboard: Found ${paginatedMatches.length} matches for ${candidate.seniority_level} candidate (page ${pageNum}, total: ${totalMatches})`);
+    console.log(`Top match score: ${sortedMatches[0]?.match_score || 0}, Lowest match score: ${sortedMatches[sortedMatches.length - 1]?.match_score || 0}`);
 
     // Calculate pagination info
     const totalPages = Math.ceil(totalMatches / limitNum);
