@@ -74,7 +74,11 @@ const CAREER_FIELDS = {
       'investment analyst', 'financial analyst', 'data analyst',
       'marketing coordinator', 'sales representative', 'account executive',
       'customer service representative', 'administrative assistant',
-      'executive assistant', 'office manager', 'coordinator'
+      'executive assistant', 'office manager', 'coordinator',
+      'chief executive officer', 'ceo', 'chief operating officer', 'coo',
+      'chief financial officer', 'cfo', 'president', 'vice president', 'vp',
+      'executive director', 'managing director', 'senior vice president',
+      'executive', 'director', 'senior director', 'associate director'
     ],
     // Secondary indicators
     secondary: [
@@ -84,13 +88,20 @@ const CAREER_FIELDS = {
       'executive', 'director', 'manager', 'strategy', 'consulting',
       'investment', 'banking', 'insurance', 'real estate', 'customer service',
       'retail', 'hospitality', 'food service', 'restaurant', 'host',
-      'waiter', 'waitress', 'bartender', 'chef', 'cook'
+      'waiter', 'waitress', 'bartender', 'chef', 'cook',
+      'strategic planning', 'business development', 'digital transformation',
+      'team leadership', 'financial management', 'stakeholder management',
+      'p&l', 'revenue growth', 'operational excellence', 'change management',
+      'mergers', 'acquisitions', 'investor relations', 'board management'
     ],
     // Education indicators
     education: [
       'business administration', 'business degree', 'management degree',
       'marketing degree', 'finance degree', 'accounting degree',
-      'business field', 'administration degree', 'management'
+      'business field', 'administration degree', 'management',
+      'mba', 'master of business administration', 'executive mba',
+      'business school', 'harvard business school', 'stanford business school',
+      'wharton', 'kellogg', 'booth', 'sloan', 'haas'
     ]
   },
   EDUCATION: {
@@ -204,7 +215,12 @@ function detectCareerFieldStrict(candidate) {
   console.log(`   Skills: [${skills.join(', ')}]`);
   
   // Check each career field with strict rules
-  for (const [fieldKey, fieldConfig] of Object.entries(CAREER_FIELDS)) {
+  // Priority order: Business first (for executives), then others
+  const priorityOrder = ['BUSINESS', 'TECHNOLOGY', 'HEALTHCARE', 'EDUCATION'];
+  
+  for (const fieldKey of priorityOrder) {
+    const fieldConfig = CAREER_FIELDS[fieldKey];
+    
     // Check primary indicators (any match = field)
     const primaryMatches = fieldConfig.primary.filter(keyword => 
       currentRole.includes(keyword) || 
