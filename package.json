@@ -8,6 +8,7 @@
     "server": "node server/index.js",
     "build": "vite build",
     "build:server": "npm run build && cp -r dist server/",
+    "vercel-build": "npm run build && cp -r dist server/",
     "start": "node server/index.js",
     "lint": "eslint .",
     "preview": "vite preview"

@@ -22,8 +22,10 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
-// Serve static files from the React build
-app.use(express.static(path.join(__dirname, 'dist')));
+// Serve static files from the React build (only in production)
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, 'dist')));
+}
 
 // API Routes
 app.get('/api/jobs', getAllJobs);
@@ -33,11 +35,24 @@ app.get('/api/jobs/:id', getJobDetails);
 app.post('/api/upload-resume', upload.single('resume'), uploadResumeResumeBased);
 app.get('/api/candidate/:id/dashboard', getResumeBasedMatches);
 
-// Serve React app for any non-API routes
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist/index.html'));
+// Serve React app for any non-API routes (only in production)
+if (process.env.NODE_ENV === 'production') {
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'dist/index.html'));
+  });
+}
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: 'Something went wrong!' });
 });
 
-app.listen(PORT, () => {
-  // Server started successfully
-});
+// Only start the server if not in Vercel environment
+if (process.env.NODE_ENV !== 'production' || process.env.VERCEL !== '1') {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+export default app;
