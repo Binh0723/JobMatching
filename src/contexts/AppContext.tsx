@@ -29,6 +29,15 @@ interface JobMatch {
   jobs: Job;
 }
 
+interface PaginationInfo {
+  currentPage: number;
+  totalPages: number;
+  totalItems: number;
+  itemsPerPage: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+}
+
 interface AppContextType {
   currentCandidate: Candidate | null;
   setCurrentCandidate: (candidate: Candidate | null) => void;
@@ -36,6 +45,8 @@ interface AppContextType {
   setJobs: (jobs: Job[]) => void;
   recommendations: JobMatch[];
   setRecommendations: (recommendations: JobMatch[]) => void;
+  pagination: PaginationInfo | null;
+  setPagination: (pagination: PaginationInfo | null) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -56,6 +67,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [currentCandidate, setCurrentCandidate] = useState<Candidate | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [recommendations, setRecommendations] = useState<JobMatch[]>([]);
+  const [pagination, setPagination] = useState<PaginationInfo | null>(null);
 
   return (
     <AppContext.Provider
@@ -66,6 +78,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         setJobs,
         recommendations,
         setRecommendations,
+        pagination,
+        setPagination,
       }}
     >
       {children}

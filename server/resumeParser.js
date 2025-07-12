@@ -18,13 +18,13 @@ if (!geminiApiKey) {
 
 const genAI = new GoogleGenerativeAI(geminiApiKey);
 
-// Function to extract text from different file types
-async function extractTextFromFile(filePath, originalName) {
+// Function to extract text from different file types using buffer
+async function extractTextFromBuffer(fileBuffer, originalName) {
   const fileExtension = path.extname(originalName).toLowerCase();
   
   try {
     if (fileExtension === '.pdf') {
-      // Use pdf2json for PDF parsing (Node.js compatible)
+      // Use pdf2json for PDF parsing with buffer
       return new Promise((resolve, reject) => {
         const pdfParser = new PDFParser();
         
@@ -44,6 +44,17 @@ async function extractTextFromFile(filePath, originalName) {
           
           if (cleanedText.length < 50) {
             console.warn('Warning: Very little text extracted from PDF. This might indicate a parsing issue.');
+            // Try alternative parsing method
+            try {
+              const alternativeText = extractTextFromPDFPages(pdfData);
+              if (alternativeText.length > cleanedText.length) {
+                console.log('Using alternative PDF parsing method');
+                resolve(alternativeText);
+                return;
+              }
+            } catch (altError) {
+              console.log('Alternative parsing also failed:', altError.message);
+            }
           }
           
           resolve(cleanedText);
@@ -54,10 +65,10 @@ async function extractTextFromFile(filePath, originalName) {
           reject(new Error('Failed to parse PDF: ' + errData.parserError));
         });
         
-        pdfParser.loadPDF(filePath);
+        pdfParser.parseBuffer(fileBuffer);
       });
     } else if (fileExtension === '.docx') {
-      const result = await mammoth.extractRawText({ path: filePath });
+      const result = await mammoth.extractRawText({ buffer: fileBuffer });
       console.log('Extracted DOCX text:', result.value.substring(0, 500) + '...'); // Log first 500 chars
       return result.value;
     } else if (fileExtension === '.doc') {
@@ -67,9 +78,35 @@ async function extractTextFromFile(filePath, originalName) {
       throw new Error('Unsupported file type. Please upload PDF or DOCX files.');
     }
   } catch (error) {
-    console.error('Error extracting text from file:', error);
+    console.error('Error extracting text from file buffer:', error);
     throw error;
   }
+}
+
+// Alternative PDF text extraction method
+function extractTextFromPDFPages(pdfData) {
+  let text = '';
+  
+  if (pdfData.Pages && pdfData.Pages.length > 0) {
+    for (let pageIndex = 0; pageIndex < pdfData.Pages.length; pageIndex++) {
+      const page = pdfData.Pages[pageIndex];
+      if (page.Texts && page.Texts.length > 0) {
+        for (let textIndex = 0; textIndex < page.Texts.length; textIndex++) {
+          const textItem = page.Texts[textIndex];
+          if (textItem.R && textItem.R.length > 0) {
+            for (let rIndex = 0; rIndex < textItem.R.length; rIndex++) {
+              const r = textItem.R[rIndex];
+              if (r.T) {
+                text += decodeURIComponent(r.T) + ' ';
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  return text.trim();
 }
 
 // Function to analyze resume with Gemini AI
@@ -90,17 +127,30 @@ async function analyzeResumeWithGemini(resumeText) {
       "summary": "brief_summary_of_candidate"
     }
     
-    CRITICAL RULES:
+    CRITICAL RULES FOR EXPERIENCE CALCULATION:
+    - Look for actual dates (e.g., "2020-2023", "Jan 2021 - Dec 2022", "3 years")
+    - Calculate total professional experience by adding up all work periods
+    - Count internships and co-ops as experience (typically 0.5-2 years depending on duration)
+    - Include part-time work and freelance work
+    - If dates are not clear, estimate conservatively
+    - Recent graduates with only internships = 0-2 years experience
+    - Students with no work experience = 0 years
+    - Entry-level: 0-2 years experience
+    - Mid-level: 3-6 years experience  
+    - Senior-level: 7+ years experience
+    
+    CRITICAL RULES FOR SKILLS:
     - Only extract skills that are EXPLICITLY mentioned in the resume
-    - Count internships, co-ops as valid experience
-    - Calculate total experience including: internships, co-ops, part-time work, freelance work
-    - Focus on the MOST DOMINANT experience (longest duration and most relevant to target role)
+    - Include programming languages, tools, frameworks, methodologies
+    - Do not infer skills from job titles or company names
+    
+    CRITICAL RULES FOR SENIORITY:
+    - DEFAULT to "entry-level" unless clearly demonstrated otherwise
+    - Recent graduates, students, and those with <3 years experience should be "entry-level"
+    - Only mark as "senior-level" if explicitly stated or clearly demonstrated (5+ years, senior titles)
     - If no professional experience is mentioned, use 0 years and "entry-level"
-    - If internships are mentioned, count them as experience (typically 0.5-2 years depending on duration)
     - If no current role is mentioned, use "Student" or "Recent Graduate"
     - If no education is mentioned, use "Not specified"
-    - DO NOT infer or assume any information not directly stated
-    - If the resume appears to be entry-level, mark it as "entry-level" regardless of keywords
     
     Resume content:
     ${resumeText}
@@ -136,10 +186,27 @@ async function analyzeResumeWithGemini(resumeText) {
       
       // Parse the JSON response
       const parsedData = JSON.parse(jsonText);
+      
+      // Validate and correct experience years
+      let experienceYears = parsedData.experience_years || 0;
+      if (typeof experienceYears !== 'number' || experienceYears < 0) {
+        experienceYears = 0;
+      }
+      
+      // Determine seniority level based on experience years
+      let seniorityLevel = parsedData.seniority_level || 'entry-level';
+      if (experienceYears >= 7) {
+        seniorityLevel = 'senior-level';
+      } else if (experienceYears >= 3) {
+        seniorityLevel = 'mid-level';
+      } else {
+        seniorityLevel = 'entry-level';
+      }
+      
       return {
         skills: parsedData.skills || [],
-        experienceYears: parsedData.experience_years || 0,
-        seniorityLevel: parsedData.seniority_level || 'entry-level',
+        experienceYears: experienceYears,
+        seniorityLevel: seniorityLevel,
         education: parsedData.education || '',
         currentRole: parsedData.current_role || '',
         summary: parsedData.summary || '',
@@ -158,8 +225,8 @@ async function analyzeResumeWithGemini(resumeText) {
   }
 }
 
-// Fallback parsing function
-function fallbackResumeParsing(resumeText) {
+// Fallback parsing function with better experience calculation
+export function fallbackResumeParsing(resumeText) {
   const skillsDatabase = [
     'JavaScript', 'React', 'Node.js', 'Python', 'Java', 'C++', 'SQL', 'PostgreSQL',
     'MongoDB', 'AWS', 'Docker', 'Kubernetes', 'Git', 'HTML', 'CSS', 'TypeScript',
@@ -172,22 +239,23 @@ function fallbackResumeParsing(resumeText) {
     resumeText.toLowerCase().includes(skill.toLowerCase())
   );
 
-  // Estimate experience based on keywords
-  const experienceKeywords = ['years', 'experience', 'senior', 'lead', 'manager'];
-  const hasExperienceKeywords = experienceKeywords.some(keyword => 
-    resumeText.toLowerCase().includes(keyword)
-  );
-
-  const experienceYears = hasExperienceKeywords ? Math.floor(Math.random() * 10) + 1 : 1;
+  // Better experience calculation based on actual content analysis
+  let experienceYears = calculateExperienceFromText(resumeText);
   
+  // Determine seniority level based on experience years
   let seniorityLevel = 'entry-level';
-  if (experienceYears >= 7) seniorityLevel = 'senior-level';
-  else if (experienceYears >= 3) seniorityLevel = 'mid-level';
+  if (experienceYears >= 7) {
+    seniorityLevel = 'senior-level';
+  } else if (experienceYears >= 3) {
+    seniorityLevel = 'mid-level';
+  } else {
+    seniorityLevel = 'entry-level';
+  }
 
   return {
     skills: extractedSkills,
-    experienceYears,
-    seniorityLevel,
+    experienceYears: experienceYears,
+    seniorityLevel: seniorityLevel,
     education: '',
     currentRole: '',
     summary: `Resume analysis - Skills: ${extractedSkills.join(', ')}`,
@@ -195,11 +263,72 @@ function fallbackResumeParsing(resumeText) {
   };
 }
 
-// Main function to parse resume
-export async function parseResumeContent(filePath, originalName) {
+// Helper function to calculate experience from text
+export function calculateExperienceFromText(resumeText) {
+  const text = resumeText.toLowerCase();
+  
+  // Look for explicit year mentions
+  const yearPattern = /(\d+)\s*(?:years?|yrs?)/g;
+  const yearMatches = [...text.matchAll(yearPattern)];
+  
+  if (yearMatches.length > 0) {
+    // Take the highest mentioned year count
+    const years = yearMatches.map(match => parseInt(match[1])).sort((a, b) => b - a);
+    return Math.min(years[0], 15); // Cap at 15 years to be reasonable
+  }
+  
+  // Look for date ranges
+  const dateRangePattern = /(\d{4})\s*[-–]\s*(\d{4}|\bpresent\b|\bcurrent\b)/gi;
+  const dateMatches = [...text.matchAll(dateRangePattern)];
+  
+  if (dateMatches.length > 0) {
+    let totalYears = 0;
+    const currentYear = new Date().getFullYear();
+    
+    dateMatches.forEach(match => {
+      const startYear = parseInt(match[1]);
+      const endYear = match[2].toLowerCase() === 'present' || match[2].toLowerCase() === 'current' 
+        ? currentYear 
+        : parseInt(match[2]);
+      
+      if (startYear && endYear && endYear >= startYear) {
+        totalYears += (endYear - startYear);
+      }
+    });
+    
+    if (totalYears > 0) {
+      return Math.min(totalYears, 15); // Cap at 15 years
+    }
+  }
+  
+  // Look for keywords that indicate experience level
+  const seniorKeywords = ['senior', 'lead', 'manager', 'director', 'vp', 'chief', 'head of'];
+  const hasSeniorKeywords = seniorKeywords.some(keyword => text.includes(keyword));
+  
+  const midLevelKeywords = ['mid-level', 'intermediate', 'experienced'];
+  const hasMidLevelKeywords = midLevelKeywords.some(keyword => text.includes(keyword));
+  
+  const entryLevelKeywords = ['entry-level', 'junior', 'graduate', 'student', 'intern', 'internship'];
+  const hasEntryLevelKeywords = entryLevelKeywords.some(keyword => text.includes(keyword));
+  
+  // Estimate based on keywords
+  if (hasSeniorKeywords) {
+    return Math.floor(Math.random() * 3) + 7; // 7-9 years
+  } else if (hasMidLevelKeywords) {
+    return Math.floor(Math.random() * 2) + 3; // 3-4 years
+  } else if (hasEntryLevelKeywords) {
+    return Math.floor(Math.random() * 2); // 0-1 years
+  }
+  
+  // Default to entry-level if no clear indicators
+  return 0;
+}
+
+// Main function to parse resume from buffer
+export async function parseResumeContent(fileBuffer, originalName) {
   try {
-    // Extract text from the uploaded file
-    const resumeText = await extractTextFromFile(filePath, originalName);
+    // Extract text from the uploaded file buffer
+    const resumeText = await extractTextFromBuffer(fileBuffer, originalName);
     
     // Analyze with Gemini AI
     const parsedData = await analyzeResumeWithGemini(resumeText);

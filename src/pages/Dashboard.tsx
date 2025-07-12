@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { User, Award, Clock, MapPin, TrendingUp, Star } from 'lucide-react';
 import JobCard from '../components/JobCard';
 import LoadingSpinner from '../components/LoadingSpinner';
+import Pagination from '../components/Pagination';
+import PageSizeSelector from '../components/PageSizeSelector';
 import { useApp } from '../contexts/AppContext';
 
 interface JobMatch {
@@ -22,20 +24,33 @@ interface JobMatch {
 }
 
 const Dashboard: React.FC = () => {
-  const { currentCandidate, recommendations, setRecommendations } = useApp();
+  const { currentCandidate, recommendations, setRecommendations, pagination, setPagination } = useApp();
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   useEffect(() => {
     if (currentCandidate) {
-      fetchDashboardData();
+      fetchDashboardData(currentPage, pageSize);
     }
-  }, [currentCandidate]);
+  }, [currentCandidate, currentPage, pageSize]);
 
-  const fetchDashboardData = async () => {
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handlePageSizeChange = (newPageSize: number) => {
+    setPageSize(newPageSize);
+    setCurrentPage(1); // Reset to first page when changing page size
+  };
+
+  const fetchDashboardData = async (page = 1, limit = 20) => {
     try {
-      const response = await fetch(`/api/candidate/${currentCandidate?.id}/dashboard`);
+      setLoading(true);
+      const response = await fetch(`/api/candidate/${currentCandidate?.id}/dashboard?page=${page}&limit=${limit}`);
       const data = await response.json();
       setRecommendations(data.recommendations);
+      setPagination(data.pagination);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
@@ -157,7 +172,9 @@ const Dashboard: React.FC = () => {
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Total Matches</p>
-                    <p className="text-2xl font-bold text-gray-900">{recommendations.length}</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {pagination ? pagination.totalItems : recommendations.length}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -189,9 +206,16 @@ const Dashboard: React.FC = () => {
 
             {/* Job Recommendations */}
             <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">
-                Recommended Jobs for You
-              </h2>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">
+                  Recommended Jobs for You
+                </h2>
+                {pagination && pagination.totalItems > recommendations.length && (
+                  <p className="text-sm text-gray-600">
+                    Showing {recommendations.length} of {pagination.totalItems} matches
+                  </p>
+                )}
+              </div>
 
               {recommendations.length > 0 ? (
                 <div className="space-y-6">
@@ -202,6 +226,31 @@ const Dashboard: React.FC = () => {
                       matchScore={match.match_score}
                     />
                   ))}
+                  
+                  {/* Pagination Controls */}
+                  {pagination && (
+                    <div className="mt-8">
+                      {pagination.totalPages > 1 && (
+                    <div className="mb-4 p-4 bg-blue-50 rounded-lg">
+                      <p className="text-blue-800 text-sm">
+                        💡 You have {pagination.totalItems} job matches! Use the pagination controls below to see more opportunities.
+                      </p>
+                    </div>
+                  )}
+                      <div className="flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
+                        <PageSizeSelector
+                          currentPageSize={pageSize}
+                          onPageSizeChange={handlePageSizeChange}
+                          options={[10, 20, 50, 100]}
+                        />
+                        <Pagination
+                          currentPage={pagination.currentPage}
+                          totalPages={pagination.totalPages}
+                          onPageChange={handlePageChange}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="text-center py-12">

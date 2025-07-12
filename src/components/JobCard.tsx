@@ -16,7 +16,7 @@ interface Job {
 
 interface JobCardProps {
   job: Job;
-  matchScore: number;
+  matchScore?: number;
 }
 
 const JobCard: React.FC<JobCardProps> = ({ job, matchScore }) => {
@@ -55,13 +55,15 @@ const JobCard: React.FC<JobCardProps> = ({ job, matchScore }) => {
         </div>
         
         {/* Match Score Badge */}
-        <div className="text-right">
-          <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getMatchColor(matchScore)}`}>
-            <Star className="h-4 w-4 mr-1" />
-            {matchScore}% Match
+        {matchScore !== undefined && (
+          <div className="text-right">
+            <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getMatchColor(matchScore)}`}>
+              <Star className="h-4 w-4 mr-1" />
+              {matchScore}% Match
+            </div>
+            <div className="text-xs text-gray-500 mt-1">{getMatchLabel(matchScore)}</div>
           </div>
-          <div className="text-xs text-gray-500 mt-1">{getMatchLabel(matchScore)}</div>
-        </div>
+        )}
       </div>
 
       <p className="text-gray-700 mb-4 line-clamp-3">{job.description}</p>

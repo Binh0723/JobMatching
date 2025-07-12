@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 
 // Import routes and middleware
-import { uploadResume, getDashboard } from './routes/candidates.js';
+import { uploadResumeResumeBased, getResumeBasedMatches } from './routes/candidates.js';
 import { getAllJobs, getJobDetails } from './routes/jobs.js';
 import { upload } from './middleware/upload.js';
 
@@ -21,13 +21,22 @@ const PORT = process.env.PORT || 3001;
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use('/uploads', express.static('uploads'));
 
-// Routes
+// Serve static files from the React build
+app.use(express.static(path.join(__dirname, 'dist')));
+
+// API Routes
 app.get('/api/jobs', getAllJobs);
 app.get('/api/jobs/:id', getJobDetails);
-app.post('/api/upload-resume', upload.single('resume'), uploadResume);
-app.get('/api/candidate/:id/dashboard', getDashboard);
+
+// Resume-based routes (no database storage of matches)
+app.post('/api/upload-resume', upload.single('resume'), uploadResumeResumeBased);
+app.get('/api/candidate/:id/dashboard', getResumeBasedMatches);
+
+// Serve React app for any non-API routes
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist/index.html'));
+});
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);

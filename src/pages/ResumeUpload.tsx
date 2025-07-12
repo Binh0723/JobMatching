@@ -14,8 +14,6 @@ const ResumeUpload: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
     preferredLocation: ''
   });
 
@@ -70,19 +68,12 @@ const ResumeUpload: React.FC = () => {
       return;
     }
 
-    if (!formData.name || !formData.email) {
-      setError('Please fill in all required fields');
-      return;
-    }
-
     setUploading(true);
     setError('');
 
     try {
       const submitData = new FormData();
       submitData.append('resume', file);
-      submitData.append('name', formData.name);
-      submitData.append('email', formData.email);
       submitData.append('preferredLocation', formData.preferredLocation);
 
       const response = await fetch('/api/upload-resume', {
@@ -125,37 +116,6 @@ const ResumeUpload: React.FC = () => {
 
         <div className="bg-white rounded-lg shadow-md p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Personal Information */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Full Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Enter your full name"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Email Address *
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="your.email@example.com"
-                />
-              </div>
-            </div>
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Preferred Location (Optional)
@@ -248,19 +208,6 @@ const ResumeUpload: React.FC = () => {
               </button>
             </div>
           </form>
-        </div>
-
-        {/* Info Section */}
-        <div className="mt-8 bg-blue-50 rounded-lg p-6">
-          <h3 className="text-lg font-medium text-blue-900 mb-3">
-            What happens next?
-          </h3>
-          <div className="space-y-2 text-blue-800">
-            <p>• We'll analyze your resume to extract key skills and experience</p>
-            <p>• Our AI will match you with relevant job opportunities</p>
-            <p>• You'll get a personalized dashboard with job recommendations</p>
-            <p>• Each job will show a compatibility score based on your profile</p>
-          </div>
         </div>
       </div>
     </div>

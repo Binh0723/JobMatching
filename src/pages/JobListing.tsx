@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Search, Filter, MapPin, Briefcase } from 'lucide-react';
 import JobCard from '../components/JobCard';
 import LoadingSpinner from '../components/LoadingSpinner';
+import Pagination from '../components/Pagination';
+import PageSizeSelector from '../components/PageSizeSelector';
 import { useApp } from '../contexts/AppContext';
 
 interface Job {
@@ -18,22 +20,35 @@ interface Job {
 }
 
 const JobListing: React.FC = () => {
-  const { jobs, setJobs } = useApp();
+  const { jobs, setJobs, pagination, setPagination } = useApp();
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [locationFilter, setLocationFilter] = useState('');
   const [experienceFilter, setExperienceFilter] = useState('');
   const [remoteFilter, setRemoteFilter] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(12);
 
   useEffect(() => {
-    fetchJobs();
-  }, []);
+    fetchJobs(currentPage, pageSize);
+  }, [currentPage, pageSize]);
 
-  const fetchJobs = async () => {
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handlePageSizeChange = (newPageSize: number) => {
+    setPageSize(newPageSize);
+    setCurrentPage(1); // Reset to first page when changing page size
+  };
+
+  const fetchJobs = async (page = 1, limit = 12) => {
     try {
-      const response = await fetch('/api/jobs');
-      const jobsData = await response.json();
-      setJobs(jobsData);
+      setLoading(true);
+      const response = await fetch(`/api/jobs?page=${page}&limit=${limit}`);
+      const data = await response.json();
+      setJobs(data.jobs);
+      setPagination(data.pagination);
     } catch (error) {
       console.error('Error fetching jobs:', error);
     } finally {
@@ -184,6 +199,22 @@ const JobListing: React.FC = () => {
             <JobCard key={job.id} job={job} />
           ))}
         </div>
+
+        {/* Pagination Controls */}
+        {pagination && (
+          <div className="mt-8 flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
+            <PageSizeSelector
+              currentPageSize={pageSize}
+              onPageSizeChange={handlePageSizeChange}
+              options={[6, 12, 24, 48]}
+            />
+            <Pagination
+              currentPage={pagination.currentPage}
+              totalPages={pagination.totalPages}
+              onPageChange={handlePageChange}
+            />
+          </div>
+        )}
 
         {filteredJobs.length === 0 && (
           <div className="text-center py-12">
